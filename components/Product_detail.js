@@ -1,25 +1,63 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState,useContext } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, TextInput } from 'react-native';
 import { useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CartContext } from '../CartProvider/CartContext';
+import { ScrollView } from 'react-native';
 
-const Product_detail = () => {
+
+const SingleProductScreen = () => {
   const route = useRoute();
   const { product } = route.params;
   const [quantity, setQuantity] = useState(1);
+  const { updateCartItemCount } = useContext(CartContext);
+  useEffect(() => {
+    const loadCartItems = async () => {
+      try {
+        const cartItemsData = await AsyncStorage.getItem('cartItems');
+        const existingCartItems = cartItemsData ? JSON.parse(cartItemsData) : [];
+        console.log('Existing Cart Items:', existingCartItems);
+      } catch (error) {
+        console.log('Error loading cart items:', error);
+      }
+    };
+
+    loadCartItems();
+  }, []);
 
   const handleQuantityChange = (value) => {
-    // Kiểm tra giá trị số lượng và đảm bảo nó không nhỏ hơn 1
     const newQuantity = Math.max(parseInt(value), 1);
     setQuantity(newQuantity);
   };
 
-  const handleBuyNow = () => {
-    // Xử lý logic khi người dùng nhấn nút mua hàng
-    // Ví dụ: chuyển tới trang thanh toán, lưu thông tin sản phẩm và số lượng vào giỏ hàng, vv.
-    console.log('Mua hàng:', product.title, 'Số lượng:', quantity);
+  const handleBuyNow = async () => {
+    try {
+      const cartItemsData = await AsyncStorage.getItem('cartItems');
+      const existingCartItems = cartItemsData ? JSON.parse(cartItemsData) : [];
+  
+      const existingItemIndex = existingCartItems.findIndex(item => item.id === product.id);
+  
+      if (existingItemIndex !== -1) {
+        // Sản phẩm đã tồn tại trong giỏ hàng, tăng số lượng
+        existingCartItems[existingItemIndex].quantity += quantity;
+      } else {
+        // Sản phẩm chưa tồn tại trong giỏ hàng, thêm mới
+        existingCartItems.push({ id: product.id, title: product.title, price: product.price, image: product.image, quantity });
+      }
+  
+      await AsyncStorage.setItem('cartItems', JSON.stringify(existingCartItems));
+  
+      const updatedCartItemCount = existingCartItems.reduce((total, item) => total + item.quantity, 0); // Tính tổng số lượng sản phẩm
+      updateCartItemCount(updatedCartItemCount); // Cập nhật số lượng sản phẩm trong giỏ hàng trong context
+  
+      console.log('Mua hàng:', product.title, 'Số lượng:', quantity);
+    } catch (error) {
+      console.log('Error saving cart items:', error);
+    }
   };
 
   return (
+    <ScrollView>
     <View style={styles.container}>
       <Image source={{ uri: product.image }} style={styles.image} />
       <Text style={styles.title}>{product.title}</Text>
@@ -45,6 +83,7 @@ const Product_detail = () => {
         </TouchableOpacity>
       </View>
     </View>
+    </ScrollView>
   );
 };
 
@@ -116,4 +155,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Product_detail;
+export default SingleProductScreen;
